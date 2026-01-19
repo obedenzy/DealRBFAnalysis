@@ -19,7 +19,8 @@ import {
   UserCheck,
   History,
   Clock,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Calendar
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { CalculationInputs, ProjectionYear } from './types';
@@ -43,6 +44,8 @@ const App: React.FC = () => {
     rbfFactor: 1.2,
     rbfTerm: 15,
     rbfMode: 'needed',
+    rbfRepaymentMode: 'term',
+    rbfRevenuePct: 7,
     arAmount: 0,
     arAdvanceRate: 90,
     arFee: 2.5,
@@ -135,9 +138,10 @@ const App: React.FC = () => {
 
           <InputGroup title="RBF Funding" icon={<TrendingUp className="w-5 h-5" />}>
             <div className="grid grid-cols-2 gap-4">
-              <InputField label={`Max Multiple (${formatCurrency(results.maxRbfFunding)})`} name="rbfMultiple" value={inputs.rbfMultiple} onChange={handleInputChange} step={0.1} />
-              <InputField label={`Repayment Multiple (${formatCurrency(results.rbfRepaymentUsed)})`} name="rbfFactor" value={inputs.rbfFactor} onChange={handleInputChange} step={0.05} />
-              <InputField label="Term (Months)" name="rbfTerm" value={inputs.rbfTerm} onChange={handleInputChange} />
+              <div className="col-span-2">
+                <InputField label={`Max Multiple (${formatCurrency(results.maxRbfFunding)})`} name="rbfMultiple" value={inputs.rbfMultiple} onChange={handleInputChange} step={0.1} />
+              </div>
+              <InputField label={`Repayment Factor (${formatCurrency(results.rbfRepaymentUsed)})`} name="rbfFactor" value={inputs.rbfFactor} onChange={handleInputChange} step={0.05} />
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold uppercase text-slate-500 leading-none">Usage Mode</label>
                 <select 
@@ -149,6 +153,48 @@ const App: React.FC = () => {
                   <option value="needed">Use Needed</option>
                   <option value="max">Use Max</option>
                 </select>
+              </div>
+
+              <div className="col-span-2 mt-2 pt-2 border-t border-slate-100">
+                <div className="flex flex-col gap-1.5 mb-4">
+                  <label className="text-xs font-bold uppercase text-slate-500 leading-none">Repayment Mode</label>
+                  <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button 
+                      onClick={() => setInputs(p => ({...p, rbfRepaymentMode: 'term'}))}
+                      className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${inputs.rbfRepaymentMode === 'term' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                    >
+                      Fixed Term
+                    </button>
+                    <button 
+                      onClick={() => setInputs(p => ({...p, rbfRepaymentMode: 'revenuePct'}))}
+                      className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${inputs.rbfRepaymentMode === 'revenuePct' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                    >
+                      Revenue %
+                    </button>
+                  </div>
+                </div>
+
+                {inputs.rbfRepaymentMode === 'term' ? (
+                  <InputField label="Term (Months)" name="rbfTerm" value={inputs.rbfTerm} onChange={handleInputChange} />
+                ) : (
+                  <div className="space-y-4">
+                    <InputField label="Revenue Repayment %" name="rbfRevenuePct" value={inputs.rbfRevenuePct} onChange={handleInputChange} suffix="%" />
+                    <div className="grid grid-cols-3 gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+                      <div className="text-center">
+                        <p className="text-[9px] font-bold text-indigo-400 uppercase">Weekly</p>
+                        <p className="text-xs font-black text-indigo-700">{formatCurrency(results.rbfWeekly)}</p>
+                      </div>
+                      <div className="text-center border-x border-indigo-100">
+                        <p className="text-[9px] font-bold text-indigo-400 uppercase">Monthly</p>
+                        <p className="text-xs font-black text-indigo-700">{formatCurrency(results.rbfMonthly)}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[9px] font-bold text-indigo-400 uppercase">Est. Mo</p>
+                        <p className="text-xs font-black text-indigo-700">{results.rbfEstimatedMonths.toFixed(1)}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </InputGroup>
@@ -400,7 +446,6 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* Existing Metrics Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col justify-between overflow-hidden relative shadow-sm">
               <div className="flex items-center justify-between mb-2">

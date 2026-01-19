@@ -3,7 +3,7 @@ import { CalculationInputs, CalculationResults, ProjectionYear, SurplusMonth } f
 export const calculateDeal = (inputs: CalculationInputs): CalculationResults => {
   const {
     revenue, sde, askingPrice,
-    rbfMultiple, rbfFactor, rbfTerm, rbfMode,
+    rbfMultiple, rbfFactor, rbfTerm, rbfMode, rbfRepaymentMode, rbfRevenuePct,
     arAmount, arAdvanceRate, arFee,
     equipValue, equipAdvanceRate, equipRate, equipTerm,
     downPaymentPct, sellerNotePct, sellerNoteRate, sellerNoteTerm,
@@ -36,7 +36,19 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
   }
 
   const rbfRepaymentUsed = rbfUsed * rbfFactor;
-  const rbfMonthly = rbfTerm > 0 ? rbfRepaymentUsed / rbfTerm : 0;
+  
+  let rbfMonthly = 0;
+  let rbfEstimatedMonths = 0;
+
+  if (rbfRepaymentMode === 'term') {
+    rbfMonthly = rbfTerm > 0 ? rbfRepaymentUsed / rbfTerm : 0;
+    rbfEstimatedMonths = rbfTerm;
+  } else {
+    rbfMonthly = monthlyRevenue * (rbfRevenuePct / 100);
+    rbfEstimatedMonths = rbfMonthly > 0 ? rbfRepaymentUsed / rbfMonthly : 0;
+  }
+
+  const rbfWeekly = rbfMonthly / 4.33;
 
   // Surplus calculation
   const surplusFunding = Math.max(0, rbfUsed - rbfNeeded);
@@ -82,16 +94,10 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
   let surplusRunwayMonths = 0;
 
   while (month <= 120 && currentRbfPaydownPool > 0) {
-    // Record starting balance for this month
     const startOfmonthBalance = currentRbfPaydownPool;
-    
-    // Every month the pool pays for RBF, Note, and the subsidized profit target
     const monthlyCost = rbfMonthly + noteMonthly + subsidizedProfitTarget;
-    
-    // How much can the pool cover this month?
     const subsidyApplied = Math.min(currentRbfPaydownPool, monthlyCost);
     
-    // Check if we fully covered the target profit month
     if (subsidyApplied >= monthlyCost) {
       surplusRunwayMonths++;
     }
@@ -106,14 +112,12 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
       dscr: Infinity 
     });
 
-    // Update pool for next month
     currentRbfPaydownPool -= subsidyApplied;
-
     month++;
     if (month > 120) break;
   }
 
-  // Projections Logic
+  // Projections
   const calculateProjections = (initialRbfMonthly: number): ProjectionYear[] => {
     const projections: ProjectionYear[] = [];
     let currentAnnualRevenue = revenue;
@@ -126,7 +130,15 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
       let annualDebtPayment = 0;
       for (let m = 1; m <= 12; m++) {
         const totalMonthsElapsed = (year - 1) * 12 + m;
-        if (totalMonthsElapsed <= rbfTerm) annualDebtPayment += initialRbfMonthly;
+        
+        // RBF check
+        if (rbfRepaymentMode === 'term') {
+          if (totalMonthsElapsed <= rbfTerm) annualDebtPayment += initialRbfMonthly;
+        } else {
+          // In revenue mode, we use the estimated months as a cutoff for the projection
+          if (totalMonthsElapsed <= Math.ceil(rbfEstimatedMonths)) annualDebtPayment += initialRbfMonthly;
+        }
+
         if (totalMonthsElapsed <= sellerNoteTerm) annualDebtPayment += noteMonthly;
         if (totalMonthsElapsed <= equipTerm) annualDebtPayment += equipMonthly;
       }
@@ -172,6 +184,8 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
     rbfUsed,
     rbfRepaymentUsed,
     rbfMonthly,
+    rbfWeekly,
+    rbfEstimatedMonths,
     netArFunding,
     equipAdvance,
     totalNonRbf,

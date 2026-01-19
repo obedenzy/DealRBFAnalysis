@@ -29,6 +29,8 @@ export interface CalculationInputs {
   rbfFactor: number;
   rbfTerm: number;
   rbfMode: 'needed' | 'max';
+  rbfRepaymentMode: 'term' | 'revenuePct'; // New
+  rbfRevenuePct: number; // New
 
   // AR Factoring
   arAmount: number;
@@ -72,6 +74,8 @@ export interface CalculationResults {
   rbfUsed: number;
   rbfRepaymentUsed: number;
   rbfMonthly: number;
+  rbfWeekly: number; // New
+  rbfEstimatedMonths: number; // New
   netArFunding: number;
   equipAdvance: number;
   totalNonRbf: number;

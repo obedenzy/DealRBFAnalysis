@@ -75,66 +75,40 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
   const totalEarnout = askingPrice * (earnoutPct / 100);
   const totalPrice = askingPrice + totalEarnout;
 
-  // Surplus Drip Strategy Schedule - TARGETING $10K PROFIT
+  // Surplus Drip Strategy Schedule - POOL AS SOURCE
   const surplusSchedule: SurplusMonth[] = [];
   let currentRbfPaydownPool = surplusRbfPaydownPool;
   let month = 1;
   let surplusRunwayMonths = 0;
 
-  const monthlyDebtToSubsidize = rbfMonthly + noteMonthly;
   const profitTarget = 10000;
 
-  while (month <= 120) {
-    // Current profit without any surplus subsidy
-    const naturalProfit = (monthlySDE - totalMonthlyDebt) * (ownershipPct / 100);
+  while (month <= 120 && currentRbfPaydownPool > 0) {
+    // Every month the pool pays for RBF, Note, and the $10k profit
+    const monthlyCost = rbfMonthly + noteMonthly + profitTarget;
     
-    let subsidyNeeded = 0;
-    if (naturalProfit < profitTarget) {
-      const shortfall = profitTarget - naturalProfit;
-      // Convert profit shortfall back to total debt reduction needed
-      // (Profit = (SDE - Debt) * Own%) -> (Shortfall / Own% = Required Debt Reduction)
-      const debtReductionNeeded = shortfall / (ownershipPct / 100);
-      
-      // We take only what's needed to hit $10k, capped by pool and available debt
-      subsidyNeeded = Math.min(currentRbfPaydownPool, debtReductionNeeded, monthlyDebtToSubsidize);
-    }
-
-    // Pro-rata reduction
-    const rbfReduction = monthlyDebtToSubsidize > 0 ? (rbfMonthly / monthlyDebtToSubsidize) * subsidyNeeded : 0;
-    const noteReduction = monthlyDebtToSubsidize > 0 ? (noteMonthly / monthlyDebtToSubsidize) * subsidyNeeded : 0;
-
-    const subsidizedRbf = rbfMonthly - rbfReduction;
-    const subsidizedNote = noteMonthly - noteReduction;
-    const subsidizedTotalDebt = subsidizedRbf + subsidizedNote + equipMonthly;
+    // How much can the pool cover this month?
+    const subsidyApplied = Math.min(currentRbfPaydownPool, monthlyCost);
     
-    const currentMonthlyProfit = (monthlySDE - subsidizedTotalDebt) * (ownershipPct / 100);
-    const currentDscr = subsidizedTotalDebt > 0 ? monthlySDE / subsidizedTotalDebt : Infinity;
+    // We update the pool balance
+    currentRbfPaydownPool -= subsidyApplied;
 
-    // Deduct from pool
-    currentRbfPaydownPool -= subsidyNeeded;
-
-    if (subsidyNeeded > 0 || month === 1) {
-       surplusSchedule.push({
-        month,
-        balance: Math.max(0, currentRbfPaydownPool),
-        rbfPayment: subsidizedRbf,
-        notePayment: subsidizedNote,
-        totalMonthlyDebt: subsidizedTotalDebt,
-        monthlyProfit: currentMonthlyProfit,
-        dscr: currentDscr
-      });
-    }
-
-    // Runway is defined as months where we successfully use the pool to hit or maintain the target
-    if (subsidyNeeded > 0 && currentMonthlyProfit >= profitTarget) {
+    // Check if we fully covered the target profit month
+    if (subsidyApplied >= monthlyCost) {
       surplusRunwayMonths++;
     }
 
+    surplusSchedule.push({
+      month,
+      balance: Math.max(0, currentRbfPaydownPool),
+      rbfPayment: rbfMonthly,
+      notePayment: noteMonthly,
+      totalMonthlyDebt: rbfMonthly + noteMonthly + equipMonthly,
+      monthlyProfit: profitTarget,
+      dscr: Infinity // Subsidized debt is effectively 0 for the owner during this period
+    });
+
     month++;
-    
-    // Stop if pool is empty
-    if (currentRbfPaydownPool <= 0) break;
-    // Safety break
     if (month > 120) break;
   }
 

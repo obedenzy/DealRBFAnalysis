@@ -10,7 +10,7 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
     balloonAfterMonths, sellerNoteType, sellerEquityPct, earnoutPct,
     targetDscr, desiredMonthlyProfit,
     growthPct, projectionYears,
-    monthlySurplusWithdrawal, surplusOwnerPayPct
+    surplusOwnerPayPct
   } = inputs;
 
   const monthlyRevenue = revenue / 12;
@@ -45,12 +45,6 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
   const surplusSelfPayPool = surplusFunding * (surplusOwnerPayPct / 100);
   const surplusRbfPaydownPool = surplusFunding - surplusSelfPayPool;
 
-  // Adjusted RBF metrics (Pay down principal at close)
-  const remainingRbfPrincipal = Math.max(0, rbfUsed - surplusRbfPaydownPool);
-  const newRbfRepayment = remainingRbfPrincipal * rbfFactor;
-  const newRbfMonthly = rbfTerm > 0 ? newRbfRepayment / rbfTerm : 0;
-  const rbfRepaymentSavings = rbfRepaymentUsed - newRbfRepayment;
-
   // 4. Monthly debt from other sources
   const equipMonthlyRate = equipRate / 100 / 12;
   let equipMonthly = 0;
@@ -73,57 +67,59 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
   }
 
   const totalMonthlyDebt = rbfMonthly + noteMonthly + equipMonthly;
-  const monthlyOwnerProfit = (monthlySDE - totalMonthlyDebt) * ((100 - sellerEquityPct) / 100);
-
-  const optimizedMonthlyDebt = newRbfMonthly + noteMonthly + equipMonthly;
-  const optimizedMonthlyProfit = (monthlySDE - optimizedMonthlyDebt) * ((100 - sellerEquityPct) / 100);
+  const ownershipPct = 100 - sellerEquityPct;
+  const monthlyOwnerProfit = (monthlySDE - totalMonthlyDebt) * (ownershipPct / 100);
 
   const actualDscr = totalMonthlyDebt > 0 ? monthlySDE / totalMonthlyDebt : Infinity;
-  const newActualDscr = optimizedMonthlyDebt > 0 ? monthlySDE / optimizedMonthlyDebt : Infinity;
 
   const totalEarnout = askingPrice * (earnoutPct / 100);
   const totalPrice = askingPrice + totalEarnout;
-  const ownershipPct = 100 - sellerEquityPct;
 
-  // Surplus Drip Strategy Schedule
+  // Surplus Drip Strategy Schedule - NEW LOGIC
   const surplusSchedule: SurplusMonth[] = [];
-  let currentSelfPayBalance = surplusSelfPayPool;
+  let currentRbfPaydownPool = surplusRbfPaydownPool;
   let month = 1;
   let surplusRunwayMonths = 0;
 
-  // Calculate schedule based on OPTIMIZED scenario (RBF already reduced by RBF-portion of surplus)
-  while (month <= 120) {
-    const withdrawal = Math.min(currentSelfPayBalance, monthlySurplusWithdrawal);
-    const currentOperatingProfit = optimizedMonthlyProfit; // Based on reduced RBF
-    const totalCashflow = currentOperatingProfit + withdrawal;
-    
-    // DSCR for the surplus drip doesn't change from the optimized base because drip isn't debt
-    const currentDscr = optimizedMonthlyDebt > 0 ? monthlySDE / optimizedMonthlyDebt : Infinity;
+  const monthlyDebtToSubsidize = rbfMonthly + noteMonthly;
 
-    if (currentSelfPayBalance > 0 || month === 1) {
+  while (month <= 120) {
+    const subsidyTaken = Math.min(currentRbfPaydownPool, monthlyDebtToSubsidize);
+    
+    // Pro-rata reduction
+    const rbfReduction = monthlyDebtToSubsidize > 0 ? (rbfMonthly / monthlyDebtToSubsidize) * subsidyTaken : 0;
+    const noteReduction = monthlyDebtToSubsidize > 0 ? (noteMonthly / monthlyDebtToSubsidize) * subsidyTaken : 0;
+
+    const subsidizedRbf = rbfMonthly - rbfReduction;
+    const subsidizedNote = noteMonthly - noteReduction;
+    const subsidizedTotalDebt = subsidizedRbf + subsidizedNote + equipMonthly;
+    
+    const currentMonthlyProfit = (monthlySDE - subsidizedTotalDebt) * (ownershipPct / 100);
+    const currentDscr = subsidizedTotalDebt > 0 ? monthlySDE / subsidizedTotalDebt : Infinity;
+
+    if (currentRbfPaydownPool > 0 || month === 1) {
        surplusSchedule.push({
         month,
-        balance: currentSelfPayBalance,
-        withdrawal: withdrawal,
-        rbfPayment: newRbfMonthly,
-        totalMonthlyDebt: optimizedMonthlyDebt,
-        operatingProfit: currentOperatingProfit,
-        totalOwnerCashflow: totalCashflow,
+        balance: currentRbfPaydownPool,
+        rbfPayment: subsidizedRbf,
+        notePayment: subsidizedNote,
+        totalMonthlyDebt: subsidizedTotalDebt,
+        monthlyProfit: currentMonthlyProfit,
         dscr: currentDscr
       });
     }
 
-    // Runway condition: Pool has cash AND total cashflow >= 10,000
-    if (currentSelfPayBalance > 0 && totalCashflow >= 10000) {
+    // Runway condition: Pool has cash AND owner profit >= 10k
+    if (currentRbfPaydownPool > 0 && currentMonthlyProfit >= 10000) {
       surplusRunwayMonths++;
     }
 
-    currentSelfPayBalance -= withdrawal;
+    currentRbfPaydownPool -= subsidyTaken;
     month++;
-    if (currentSelfPayBalance <= 0 && month > surplusSchedule.length) break;
+    if (currentRbfPaydownPool <= 0 && month > surplusSchedule.length) break;
   }
 
-  // Projections Logic
+  // Projections Logic (Standard Projections)
   const calculateProjections = (initialRbfMonthly: number): ProjectionYear[] => {
     const projections: ProjectionYear[] = [];
     let currentAnnualRevenue = revenue;
@@ -159,7 +155,6 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
   };
 
   const standardProjections = calculateProjections(rbfMonthly);
-  const optimizedProjections = calculateProjections(newRbfMonthly);
 
   // Validation
   const reasonsForFailure: string[] = [];
@@ -199,12 +194,12 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
     surplusFunding,
     surplusSelfPayPool,
     surplusRbfPaydownPool,
-    rbfRepaymentSavings,
-    newRbfMonthly,
-    newMonthlyOwnerProfit: optimizedMonthlyProfit,
-    newActualDscr,
+    rbfRepaymentSavings: 0, // No longer immediate paydown
+    newRbfMonthly: rbfMonthly,
+    newMonthlyOwnerProfit: monthlyOwnerProfit,
+    newActualDscr: actualDscr,
     standardProjections,
-    optimizedProjections,
+    optimizedProjections: standardProjections, // Keep simple for now
     surplusSchedule,
     surplusRunwayMonths
   };

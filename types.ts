@@ -10,12 +10,11 @@ export interface ProjectionYear {
 
 export interface SurplusMonth {
   month: number;
-  balance: number; // Remaining self-pay pool
-  withdrawal: number; // Amount taken this month
-  rbfPayment: number; // The reduced RBF payment
-  totalMonthlyDebt: number; // All debt payments combined
-  operatingProfit: number; // SDE - debt
-  totalOwnerCashflow: number; // Operating Profit + Withdrawal
+  balance: number; // Remaining RBF Pay-down pool
+  rbfPayment: number; // Subsidized RBF payment
+  notePayment: number; // Subsidized Seller Note payment
+  totalMonthlyDebt: number; // Combined subsidized debt
+  monthlyProfit: number; // SDE - subsidized debt
   dscr: number;
 }
 

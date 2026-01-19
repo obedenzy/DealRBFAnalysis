@@ -9,24 +9,20 @@ import {
   XCircle,
   TrendingUp,
   PieChart as PieChartIcon,
-  Info,
   Zap,
   Coins,
-  ArrowDownToLine,
   ShieldCheck,
-  Activity,
   CalendarDays,
   Table as TableIcon,
   Tag,
   CreditCard,
   UserCheck,
-  Banknote,
   History,
   Clock,
   ArrowRightLeft
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { CalculationInputs, ProjectionYear, SurplusMonth } from './types';
+import { CalculationInputs, ProjectionYear } from './types';
 import { calculateDeal } from './utils/calculations';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
@@ -212,8 +208,7 @@ const App: React.FC = () => {
               <InputField label="Projection Years" name="projectionYears" value={inputs.projectionYears} onChange={handleInputChange} />
               <div className="col-span-2 border-t border-slate-100 mt-2 pt-4 space-y-4">
                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Surplus Allocation Strategy</p>
-                <InputField label="Self-Pay % of Surplus" name="surplusOwnerPayPct" value={inputs.surplusOwnerPayPct} onChange={handleInputChange} suffix="%" />
-                <InputField label="Monthly Surplus Drip" name="monthlySurplusWithdrawal" value={inputs.monthlySurplusWithdrawal} onChange={handleInputChange} prefix="$" />
+                <InputField label="Self-Pay portion (%)" name="surplusOwnerPayPct" value={inputs.surplusOwnerPayPct} onChange={handleInputChange} suffix="%" />
               </div>
             </div>
           </InputGroup>
@@ -319,11 +314,11 @@ const App: React.FC = () => {
                     <p className="text-xl font-black text-slate-900">{formatCurrency(results.surplusFunding)}</p>
                   </div>
                   <div className="bg-violet-50 p-4 rounded-xl border border-violet-100">
-                    <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest mb-1">Self-Pay Pool ({inputs.surplusOwnerPayPct}%)</p>
+                    <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest mb-1">Self-Pay Portion ({inputs.surplusOwnerPayPct}%)</p>
                     <p className="text-xl font-black text-violet-700">{formatCurrency(results.surplusSelfPayPool)}</p>
                   </div>
                   <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">RBF Pay-down ({100 - inputs.surplusOwnerPayPct}%)</p>
+                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">RBF Pay-down Pool</p>
                     <p className="text-xl font-black text-indigo-700">{formatCurrency(results.surplusRbfPaydownPool)}</p>
                   </div>
                 </div>
@@ -332,23 +327,22 @@ const App: React.FC = () => {
                   <div className="flex items-start gap-3 text-sm text-slate-600 bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                     <ShieldCheck className="w-6 h-6 text-emerald-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-black text-slate-800 mb-1 uppercase text-[10px] tracking-widest">Surplus Optimization Logic</p>
+                      <p className="font-black text-slate-800 mb-1 uppercase text-[10px] tracking-widest">Pay-down Strategy</p>
                       <p className="text-xs leading-relaxed">
-                        Allocation: <strong>{formatCurrency(results.surplusRbfPaydownPool)}</strong> reduces your RBF debt obligation immediately. 
-                        Remainder <strong>{formatCurrency(results.surplusSelfPayPool)}</strong> is held in reserve to drip <strong>{formatCurrency(inputs.monthlySurplusWithdrawal)}</strong>/mo to you.
+                        The <strong>{formatCurrency(results.surplusRbfPaydownPool)}</strong> pool is applied monthly to cover RBF and Seller Note payments, maintaining at least <strong>$10,000/mo</strong> in owner profit.
                       </p>
                     </div>
                   </div>
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" /> Operational Impacts</h4>
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><ArrowRightLeft className="w-4 h-4" /> Debt Impact</h4>
                     <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-slate-500 uppercase">New RBF Payment</span>
-                        <span className="font-black text-indigo-600">{formatCurrency(results.newRbfMonthly)}</span>
+                        <span className="font-bold text-slate-500 uppercase">Monthly Debt to Cover</span>
+                        <span className="font-black text-indigo-600">{formatCurrency(results.rbfMonthly + results.noteMonthly)}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-slate-500 uppercase">Total Debt Service</span>
-                        <span className="font-black text-rose-500">{formatCurrency(results.surplusSchedule[0]?.totalMonthlyDebt || 0)}</span>
+                        <span className="font-bold text-slate-500 uppercase">Subsidized Profit Target</span>
+                        <span className="font-black text-emerald-600">$10,000+</span>
                       </div>
                     </div>
                   </div>
@@ -358,39 +352,35 @@ const App: React.FC = () => {
                   <div className="flex items-center justify-between mb-4 px-1">
                     <div className="flex items-center gap-2">
                       <History className="w-4 h-4 text-violet-500" />
-                      <h3 className="text-[10px] font-black uppercase text-slate-700 tracking-widest">Full Repayment & Distribution Runway</h3>
+                      <h3 className="text-[10px] font-black uppercase text-slate-700 tracking-widest">Monthly Pay-down Breakdown</h3>
                     </div>
-                    <span className="text-[9px] font-bold text-slate-400 italic">Target: Positive Profit &gt; $10,000</span>
+                    <span className="text-[9px] font-bold text-slate-400 italic">Target: Profit &gt; $10k</span>
                   </div>
                   
                   <div className="overflow-x-auto border border-slate-100 rounded-xl bg-white shadow-inner max-h-[400px] overflow-y-auto custom-scrollbar">
-                    <table className="w-full text-left text-[11px] border-collapse min-w-[700px]">
+                    <table className="w-full text-left text-[11px] border-collapse min-w-[750px]">
                       <thead className="sticky top-0 z-10">
                         <tr className="bg-slate-50 border-b border-slate-200">
                           <th className="px-4 py-3 font-black text-slate-500 uppercase">Mo</th>
                           <th className="px-4 py-3 font-black text-slate-500 uppercase">Rem. Pool</th>
-                          <th className="px-4 py-3 font-black text-slate-500 uppercase">Drip Taken</th>
-                          <th className="px-4 py-3 font-black text-slate-500 uppercase">Operating Profit</th>
-                          <th className="px-4 py-3 font-black text-slate-500 uppercase">Total Cashflow</th>
-                          <th className="px-4 py-3 font-black text-slate-500 uppercase">Status</th>
+                          <th className="px-4 py-3 font-black text-slate-500 uppercase">Monthly RBF</th>
+                          <th className="px-4 py-3 font-black text-slate-500 uppercase">Monthly Note</th>
+                          <th className="px-4 py-3 font-black text-slate-500 uppercase">New DSCR</th>
+                          <th className="px-4 py-3 font-black text-slate-500 uppercase">Monthly Profit</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {results.surplusSchedule.map((s, i) => (
-                          <tr key={i} className={`transition-colors ${s.totalOwnerCashflow >= 10000 ? 'hover:bg-emerald-50/30' : 'bg-rose-50/10 grayscale opacity-60'}`}>
+                          <tr key={i} className={`transition-colors ${s.monthlyProfit >= 10000 ? 'hover:bg-emerald-50/30' : 'bg-rose-50/10 grayscale opacity-60'}`}>
                             <td className="px-4 py-3 font-black text-slate-900">{s.month}</td>
                             <td className="px-4 py-3 font-medium text-slate-400">{formatCurrency(s.balance)}</td>
-                            <td className="px-4 py-3 font-black text-violet-600">+{formatCurrency(s.withdrawal)}</td>
-                            <td className="px-4 py-3 font-bold text-slate-600">{formatCurrency(s.operatingProfit)}</td>
-                            <td className={`px-4 py-3 font-black ${s.totalOwnerCashflow >= 10000 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {formatCurrency(s.totalOwnerCashflow)}
+                            <td className="px-4 py-3 font-bold text-indigo-600">{formatCurrency(s.rbfPayment)}</td>
+                            <td className="px-4 py-3 font-bold text-slate-600">{formatCurrency(s.notePayment)}</td>
+                            <td className={`px-4 py-3 font-black ${s.dscr >= 1.5 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                              {s.dscr === Infinity ? '∞' : s.dscr.toFixed(2)}
                             </td>
-                            <td className="px-4 py-3">
-                              {s.totalOwnerCashflow >= 10000 ? (
-                                <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-black uppercase">On Target</span>
-                              ) : (
-                                <span className="text-[9px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded font-black uppercase">Low Profit</span>
-                              )}
+                            <td className={`px-4 py-3 font-black ${s.monthlyProfit >= 10000 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {formatCurrency(s.monthlyProfit)}
                             </td>
                           </tr>
                         ))}
@@ -457,8 +447,7 @@ const App: React.FC = () => {
               <TableIcon className="w-5 h-5 text-indigo-500" />
               <h3 className="text-lg font-black text-slate-800">Growth Projections ({inputs.projectionYears} Years)</h3>
             </div>
-            <ProjectionTable title="Scenario A: Standard Deal" data={results.standardProjections} theme="indigo" />
-            <ProjectionTable title="Scenario B: Surplus Optimization" data={results.optimizedProjections} theme="violet" isOptimized />
+            <ProjectionTable title="Scenario: Standard Deal" data={results.standardProjections} theme="indigo" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

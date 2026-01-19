@@ -75,20 +75,33 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
   const totalEarnout = askingPrice * (earnoutPct / 100);
   const totalPrice = askingPrice + totalEarnout;
 
-  // Surplus Drip Strategy Schedule - NEW LOGIC
+  // Surplus Drip Strategy Schedule - OPTIMIZED FOR $10K PROFIT TARGET
   const surplusSchedule: SurplusMonth[] = [];
   let currentRbfPaydownPool = surplusRbfPaydownPool;
   let month = 1;
   let surplusRunwayMonths = 0;
 
   const monthlyDebtToSubsidize = rbfMonthly + noteMonthly;
+  const profitTarget = 10000;
 
   while (month <= 120) {
-    const subsidyTaken = Math.min(currentRbfPaydownPool, monthlyDebtToSubsidize);
+    // 1. Calculate natural profit (without subsidy)
+    const naturalProfit = (monthlySDE - totalMonthlyDebt) * (ownershipPct / 100);
     
-    // Pro-rata reduction
-    const rbfReduction = monthlyDebtToSubsidize > 0 ? (rbfMonthly / monthlyDebtToSubsidize) * subsidyTaken : 0;
-    const noteReduction = monthlyDebtToSubsidize > 0 ? (noteMonthly / monthlyDebtToSubsidize) * subsidyTaken : 0;
+    let subsidyNeeded = 0;
+    if (naturalProfit < profitTarget) {
+      // How much more profit do we need?
+      const profitShortfall = profitTarget - naturalProfit;
+      // How much debt reduction does that require? (Shortfall / Ownership%)
+      const requiredDebtReduction = profitShortfall / (ownershipPct / 100);
+      
+      // We can only subsidize what we have in the pool and what exists in RBF/Note debt
+      subsidyNeeded = Math.min(currentRbfPaydownPool, requiredDebtReduction, monthlyDebtToSubsidize);
+    }
+
+    // Pro-rata reduction based on subsidy needed to hit target
+    const rbfReduction = monthlyDebtToSubsidize > 0 ? (rbfMonthly / monthlyDebtToSubsidize) * subsidyNeeded : 0;
+    const noteReduction = monthlyDebtToSubsidize > 0 ? (noteMonthly / monthlyDebtToSubsidize) * subsidyNeeded : 0;
 
     const subsidizedRbf = rbfMonthly - rbfReduction;
     const subsidizedNote = noteMonthly - noteReduction;
@@ -97,6 +110,7 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
     const currentMonthlyProfit = (monthlySDE - subsidizedTotalDebt) * (ownershipPct / 100);
     const currentDscr = subsidizedTotalDebt > 0 ? monthlySDE / subsidizedTotalDebt : Infinity;
 
+    // Only add to schedule if there is a pool or it's the start
     if (currentRbfPaydownPool > 0 || month === 1) {
        surplusSchedule.push({
         month,
@@ -109,14 +123,18 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
       });
     }
 
-    // Runway condition: Pool has cash AND owner profit >= 10k
-    if (currentRbfPaydownPool > 0 && currentMonthlyProfit >= 10000) {
+    // Runway condition: Pool has cash and we successfully reached or maintained profit target
+    if (currentRbfPaydownPool > 0 && subsidyNeeded > 0) {
       surplusRunwayMonths++;
     }
 
-    currentRbfPaydownPool -= subsidyTaken;
+    currentRbfPaydownPool -= subsidyNeeded;
     month++;
+    
+    // Stop if pool is empty and we've already recorded the first month or last subsidy month
     if (currentRbfPaydownPool <= 0 && month > surplusSchedule.length) break;
+    // Safety break for term limits
+    if (month > Math.max(rbfTerm, sellerNoteTerm, equipTerm) && currentRbfPaydownPool <= 0) break;
   }
 
   // Projections Logic (Standard Projections)
@@ -194,12 +212,12 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
     surplusFunding,
     surplusSelfPayPool,
     surplusRbfPaydownPool,
-    rbfRepaymentSavings: 0, // No longer immediate paydown
+    rbfRepaymentSavings: 0,
     newRbfMonthly: rbfMonthly,
     newMonthlyOwnerProfit: monthlyOwnerProfit,
     newActualDscr: actualDscr,
     standardProjections,
-    optimizedProjections: standardProjections, // Keep simple for now
+    optimizedProjections: standardProjections,
     surplusSchedule,
     surplusRunwayMonths
   };

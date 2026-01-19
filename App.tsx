@@ -540,48 +540,7 @@ const App: React.FC = () => {
             <ProjectionTable title="Scenario: Standard Deal" data={results.standardProjections} theme="indigo" />
           </div>
 
-          // <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          //   <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
-          //     <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Structure Allocation</h3>
-          //     <div className="h-48 w-full">
-          //       <ResponsiveContainer width="100%" height="100%">
-          //         <PieChart>
-          //           <Pie data={chartData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
-          //             {chartData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-          //           </Pie>
-          //           <RechartsTooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px' }} />
-          //         </PieChart>
-          //       </ResponsiveContainer>
-          //     </div>
-          //     <div className="grid grid-cols-2 gap-2 mt-4">
-          //       {chartData.map((d, i) => (
-          //         <div key={i} className="flex items-center gap-2 text-xs font-semibold">
-          //           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-          //           <span className="text-slate-500 truncate">{d.name}: {d.value}%</span>
-          //         </div>
-          //       ))}
-          //     </div>
-          //   </div>
-
-          //   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          //     <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-          //       <h3 className="text-sm font-bold uppercase tracking-widest text-slate-600">Funding Utilization</h3>
-          //     </div>
-          //     <div className="p-6 space-y-4">
-          //       <div className="grid grid-cols-2 gap-4">
-          //         <StatBox label="Max RBF Cap" value={results.maxRbfFunding} subLabel={`${inputs.rbfMultiple}x Rev`} color="indigo" />
-          //         <StatBox label="RBF Utilized" value={results.rbfUsed} subLabel={`${((results.rbfUsed / results.maxRbfFunding) * 100 || 0).toFixed(0)}%`} color="violet" />
-          //         <StatBox label="AR Leverage" value={results.netArFunding} subLabel="Factored" color="emerald" />
-          //         <StatBox label="Equip Advance" value={results.equipAdvance} subLabel="Collateral" color="indigo" />
-          //       </div>
-          //       <div className="space-y-3 pt-4 border-t border-slate-100">
-          //         <ProgressBar label="RBF Pymt" amount={results.rbfMonthly} total={results.totalMonthlyDebt} color="#8b5cf6" />
-          //         <ProgressBar label="Seller Note" amount={results.noteMonthly} total={results.totalMonthlyDebt} color="#6366f1" />
-          //         <ProgressBar label="Equip Loan" amount={results.equipMonthly} total={results.totalMonthlyDebt} color="#10b981" />
-          //       </div>
-          //     </div>
-          //   </div>
-          // </div>
+          
           <div className="py-8 text-center opacity-40"><p className="text-[10px] uppercase font-bold tracking-widest">Architect End Report</p></div>
         </section>
       </main>

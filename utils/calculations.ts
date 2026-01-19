@@ -10,7 +10,7 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
     balloonAfterMonths, sellerNoteType, sellerEquityPct, earnoutPct,
     targetDscr, desiredMonthlyProfit,
     growthPct, projectionYears,
-    surplusOwnerPayPct
+    surplusOwnerPayPct, subsidizedProfitTarget
   } = inputs;
 
   const monthlyRevenue = revenue / 12;
@@ -75,24 +75,22 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
   const totalEarnout = askingPrice * (earnoutPct / 100);
   const totalPrice = askingPrice + totalEarnout;
 
-  // Surplus Drip Strategy Schedule - POOL AS SOURCE
+  // Surplus Drip Strategy Schedule
   const surplusSchedule: SurplusMonth[] = [];
   let currentRbfPaydownPool = surplusRbfPaydownPool;
   let month = 1;
   let surplusRunwayMonths = 0;
 
-  const profitTarget = 10000;
-
   while (month <= 120 && currentRbfPaydownPool > 0) {
-    // Every month the pool pays for RBF, Note, and the $10k profit
-    const monthlyCost = rbfMonthly + noteMonthly + profitTarget;
+    // Record starting balance for this month
+    const startOfmonthBalance = currentRbfPaydownPool;
+    
+    // Every month the pool pays for RBF, Note, and the subsidized profit target
+    const monthlyCost = rbfMonthly + noteMonthly + subsidizedProfitTarget;
     
     // How much can the pool cover this month?
     const subsidyApplied = Math.min(currentRbfPaydownPool, monthlyCost);
     
-    // We update the pool balance
-    currentRbfPaydownPool -= subsidyApplied;
-
     // Check if we fully covered the target profit month
     if (subsidyApplied >= monthlyCost) {
       surplusRunwayMonths++;
@@ -100,13 +98,16 @@ export const calculateDeal = (inputs: CalculationInputs): CalculationResults => 
 
     surplusSchedule.push({
       month,
-      balance: Math.max(0, currentRbfPaydownPool),
+      balance: startOfmonthBalance,
       rbfPayment: rbfMonthly,
       notePayment: noteMonthly,
       totalMonthlyDebt: rbfMonthly + noteMonthly + equipMonthly,
-      monthlyProfit: profitTarget,
-      dscr: Infinity // Subsidized debt is effectively 0 for the owner during this period
+      monthlyProfit: subsidizedProfitTarget,
+      dscr: Infinity 
     });
+
+    // Update pool for next month
+    currentRbfPaydownPool -= subsidyApplied;
 
     month++;
     if (month > 120) break;

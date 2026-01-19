@@ -63,7 +63,8 @@ const App: React.FC = () => {
     growthPct: 5,
     projectionYears: 5,
     monthlySurplusWithdrawal: 20000,
-    surplusOwnerPayPct: 50
+    surplusOwnerPayPct: 50,
+    subsidizedProfitTarget: 10000
   });
 
   const results = useMemo(() => calculateDeal(inputs), [inputs]);
@@ -209,6 +210,7 @@ const App: React.FC = () => {
               <div className="col-span-2 border-t border-slate-100 mt-2 pt-4 space-y-4">
                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Surplus Allocation Strategy</p>
                 <InputField label="Self-Pay portion (%)" name="surplusOwnerPayPct" value={inputs.surplusOwnerPayPct} onChange={handleInputChange} suffix="%" />
+                <InputField label="Subsidized Profit Target" name="subsidizedProfitTarget" value={inputs.subsidizedProfitTarget} onChange={handleInputChange} prefix="$" />
               </div>
             </div>
           </InputGroup>
@@ -329,7 +331,7 @@ const App: React.FC = () => {
                     <div>
                       <p className="font-black text-slate-800 mb-1 uppercase text-[10px] tracking-widest">Pay-down Strategy</p>
                       <p className="text-xs leading-relaxed">
-                        The <strong>{formatCurrency(results.surplusRbfPaydownPool)}</strong> pool is applied monthly to cover RBF and Seller Note payments, maintaining at least <strong>$10,000/mo</strong> in owner profit.
+                        The <strong>{formatCurrency(results.surplusRbfPaydownPool)}</strong> pool is applied monthly to cover RBF and Seller Note payments, maintaining <strong>{formatCurrency(inputs.subsidizedProfitTarget)}/mo</strong> in owner profit.
                       </p>
                     </div>
                   </div>
@@ -342,7 +344,7 @@ const App: React.FC = () => {
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="font-bold text-slate-500 uppercase">Subsidized Profit Target</span>
-                        <span className="font-black text-emerald-600">$10,000+</span>
+                        <span className="font-black text-emerald-600">{formatCurrency(inputs.subsidizedProfitTarget)}</span>
                       </div>
                     </div>
                   </div>
@@ -354,7 +356,7 @@ const App: React.FC = () => {
                       <History className="w-4 h-4 text-violet-500" />
                       <h3 className="text-[10px] font-black uppercase text-slate-700 tracking-widest">Monthly Pay-down Breakdown</h3>
                     </div>
-                    <span className="text-[9px] font-bold text-slate-400 italic">Target: Profit &gt; $10k</span>
+                    <span className="text-[9px] font-bold text-slate-400 italic">Target: Profit &gt; {formatCurrency(inputs.subsidizedProfitTarget)}</span>
                   </div>
                   
                   <div className="overflow-x-auto border border-slate-100 rounded-xl bg-white shadow-inner max-h-[400px] overflow-y-auto custom-scrollbar">
@@ -371,7 +373,7 @@ const App: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {results.surplusSchedule.map((s, i) => (
-                          <tr key={i} className={`transition-colors ${s.monthlyProfit >= 10000 ? 'hover:bg-emerald-50/30' : 'bg-rose-50/10 grayscale opacity-60'}`}>
+                          <tr key={i} className={`transition-colors ${s.monthlyProfit >= inputs.subsidizedProfitTarget ? 'hover:bg-emerald-50/30' : 'bg-rose-50/10 grayscale opacity-60'}`}>
                             <td className="px-4 py-3 font-black text-slate-900">{s.month}</td>
                             <td className="px-4 py-3 font-medium text-slate-400">{formatCurrency(s.balance)}</td>
                             <td className="px-4 py-3 font-bold text-indigo-600">{formatCurrency(s.rbfPayment)}</td>
@@ -379,7 +381,7 @@ const App: React.FC = () => {
                             <td className={`px-4 py-3 font-black ${s.dscr >= 1.5 ? 'text-emerald-500' : 'text-rose-500'}`}>
                               {s.dscr === Infinity ? '∞' : s.dscr.toFixed(2)}
                             </td>
-                            <td className={`px-4 py-3 font-black ${s.monthlyProfit >= 10000 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            <td className={`px-4 py-3 font-black ${s.monthlyProfit >= inputs.subsidizedProfitTarget ? 'text-emerald-600' : 'text-rose-600'}`}>
                               {formatCurrency(s.monthlyProfit)}
                             </td>
                           </tr>

@@ -62,6 +62,7 @@ export interface CalculationInputs {
   // Surplus Strategy
   monthlySurplusWithdrawal: number;
   surplusOwnerPayPct: number; // % of surplus to keep for self-pay drip
+  subsidizedProfitTarget: number; // Target profit to maintain during surplus drip
 }
 
 export interface CalculationResults {
